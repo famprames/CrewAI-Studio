@@ -1,6 +1,7 @@
 {
   "language": {
-    "select": "语言"
+    "select": "语言",
+    "locked_while_running": "运行任务时无法切换语言"
   },
   "page": {
     "title": "CrewAI Studio",

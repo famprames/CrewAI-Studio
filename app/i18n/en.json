@@ -1,6 +1,7 @@
 {
   "language": {
-    "select": "Language"
+    "select": "Language",
+    "locked_while_running": "Language can't be changed while a crew is running"
   },
   "page": {
     "title": "CrewAI Studio",

@@ -122,14 +122,22 @@ def setup_language_selector():
         display_names = [lang_names.get(lang, lang) for lang in languages]
 
         selected_idx = languages.index(current_lang)
+        # Lock the language selector while a crew is running. Switching language
+        # calls st.rerun(), which interrupts the run page's live refresh loop and
+        # drops the running crew's progress (and can leave the Kickoff page
+        # half-rendered). Re-enables automatically once the run finishes.
+        running = ss.get("running", False)
         selected_lang = st.radio(
             t("language.select"),
             languages,
             index=selected_idx,
             format_func=lambda x: lang_names.get(x, x),
             label_visibility="collapsed",
-            key="lang_selector"
+            key="lang_selector",
+            disabled=running,
         )
 
-        if selected_lang != current_lang:
+        if running:
+            st.caption(t("language.locked_while_running"))
+        elif selected_lang != current_lang:
             set_language(selected_lang)

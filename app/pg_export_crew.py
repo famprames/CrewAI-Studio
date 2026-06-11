@@ -15,6 +15,199 @@ from my_task import MyTask
 from datetime import datetime
 from i18n import t
 
+# Tools that live in app/tools/ (not in crewai_tools). Their source files plus
+# the bundled i18n module must ship with the export.
+CUSTOM_TOOL_MODULES = {
+    'CustomApiTool',
+    'CustomFileWriteTool',
+    'CustomCodeInterpreterTool',
+    'ScrapeWebsiteToolEnhanced',
+    'CSVSearchToolEnhanced',
+    'DuckDuckGoSearchTool',
+    'ScrapflyScrapeWebsiteTool',
+}
+
+# Tools imported from langchain_community instead of crewai_tools.
+LANGCHAIN_COMMUNITY_TOOLS = {'YahooFinanceNewsTool'}
+
+# Packages every exported app needs. Versions are pinned from the Studio's
+# own requirements.txt at export time when available.
+EXPORT_BASE_REQUIREMENTS = [
+    'crewai',
+    'crewai-tools',
+    'streamlit',
+    'python-dotenv',
+    'langchain-openai',
+    'langchain-groq',
+    'langchain-anthropic',
+]
+
+# Extra packages required by specific tools.
+EXPORT_TOOL_REQUIREMENTS = {
+    'CustomApiTool': ['requests'],
+    'CustomCodeInterpreterTool': ['docker'],
+    'ScrapeWebsiteToolEnhanced': ['requests', 'beautifulsoup4'],
+    'DuckDuckGoSearchTool': ['duckduckgo-search'],
+    'ScrapflyScrapeWebsiteTool': ['scrapfly-sdk'],
+    'YahooFinanceNewsTool': ['langchain-community', 'yfinance'],
+}
+
+# Standalone i18n module bundled with the export. The custom tools call t()
+# at import time, so this must work without Streamlit; language comes from
+# the DEFAULT_LANGUAGE env var (default: en).
+EXPORT_I18N_PY = '''"""Standalone i18n module bundled by CrewAI Studio export."""
+import json
+import os
+from pathlib import Path
+
+I18N_DIR = Path(__file__).parent / "i18n"
+DEFAULT_LANGUAGE = os.getenv("DEFAULT_LANGUAGE", "en")
+
+_translations = {}
+
+
+def _load_translations():
+    global _translations
+    if not _translations:
+        for lang_file in I18N_DIR.glob("*.json"):
+            with open(lang_file, "r", encoding="utf-8") as f:
+                _translations[lang_file.stem] = json.load(f)
+
+
+def get_available_languages():
+    _load_translations()
+    return sorted(_translations.keys())
+
+
+def get_current_language():
+    _load_translations()
+    return DEFAULT_LANGUAGE if DEFAULT_LANGUAGE in _translations else "en"
+
+
+def _lookup(lang, keys):
+    node = _translations.get(lang, {})
+    for k in keys:
+        if not isinstance(node, dict):
+            return None
+        node = node.get(k)
+    return node
+
+
+def t(key, **kwargs):
+    """Translate a dot-notation key; falls back to English, then to the key."""
+    _load_translations()
+    keys = key.split(".")
+    translation = _lookup(get_current_language(), keys)
+    if translation is None:
+        translation = _lookup("en", keys)
+    if translation is None:
+        return key
+    if kwargs and isinstance(translation, str):
+        try:
+            return translation.format(**kwargs)
+        except (KeyError, ValueError):
+            return translation
+    return translation
+'''
+
+# Standalone LLM factory bundled with the export. Mirrors the Studio's
+# llms.py providers, but reads credentials directly from the environment
+# (.env) instead of the Streamlit session.
+EXPORT_LLMS_PY = '''"""Standalone LLM factory bundled by CrewAI Studio export."""
+import os
+
+from dotenv import load_dotenv
+from crewai import LLM
+from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
+from langchain_anthropic import ChatAnthropic
+
+load_dotenv()
+
+
+def create_openai_llm(model, temperature):
+    api_key = os.getenv("OPENAI_API_KEY")
+    api_base = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1/")
+    if not api_key:
+        raise ValueError("OpenAI API key not set in .env file")
+    os.environ["OPENAI_API_KEY"] = api_key
+    os.environ["OPENAI_API_BASE"] = api_base
+    return LLM(model=model, temperature=temperature, base_url=api_base)
+
+
+def create_anthropic_llm(model, temperature):
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise ValueError("Anthropic API key not set in .env file")
+    return ChatAnthropic(
+        anthropic_api_key=api_key,
+        model_name=model,
+        temperature=temperature,
+        max_tokens=4095,
+    )
+
+
+def create_groq_llm(model, temperature):
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("Groq API key not set in .env file")
+    return ChatGroq(groq_api_key=api_key, model_name=model, temperature=temperature, max_tokens=4095)
+
+
+def create_ollama_llm(model, temperature):
+    host = os.getenv("OLLAMA_HOST")
+    if not host:
+        raise ValueError("OLLAMA_HOST not set in .env file")
+    os.environ["OPENAI_API_KEY"] = "ollama"
+    os.environ["OPENAI_API_BASE"] = host
+    return LLM(model=model, temperature=temperature, base_url=host)
+
+
+def create_xai_llm(model, temperature):
+    host = "https://api.x.ai/v1"
+    api_key = os.getenv("XAI_API_KEY")
+    if not api_key:
+        raise ValueError("XAI_API_KEY must be set in .env file")
+    os.environ["OPENAI_API_KEY"] = api_key
+    os.environ["OPENAI_API_BASE"] = host
+    return LLM(model=model, temperature=temperature, api_key=api_key, base_url=host)
+
+
+def create_lmstudio_llm(model, temperature):
+    api_base = os.getenv("LMSTUDIO_API_BASE")
+    if not api_base:
+        raise ValueError("LM Studio API base not set in .env file")
+    os.environ["OPENAI_API_KEY"] = "lm-studio"
+    os.environ["OPENAI_API_BASE"] = api_base
+    return ChatOpenAI(
+        openai_api_key="lm-studio",
+        openai_api_base=api_base,
+        temperature=temperature,
+        max_tokens=4095,
+    )
+
+
+LLM_CONFIG = {
+    "OpenAI": create_openai_llm,
+    "Groq": create_groq_llm,
+    "Ollama": create_ollama_llm,
+    "Anthropic": create_anthropic_llm,
+    "LM Studio": create_lmstudio_llm,
+    "Xai": create_xai_llm,
+}
+
+
+def create_llm(provider_and_model, temperature=0.15):
+    if ": " not in provider_and_model:
+        raise ValueError("Input string must be in format 'Provider: Model'")
+    provider, model = provider_and_model.split(": ", 1)
+    create_llm_func = LLM_CONFIG.get(provider)
+    if not create_llm_func:
+        raise ValueError(f"LLM provider {provider} is not recognized or not supported")
+    return create_llm_func(model, temperature)
+'''
+
+
 class PageExportCrew:
     def __init__(self):
         self.name = t("page.import_export")
@@ -30,12 +223,19 @@ class PageExportCrew:
         return list(placeholders)
 
     def generate_streamlit_app(self, crew, output_dir):
+        """Generate the standalone app.py and bundle used custom tool sources.
+
+        Returns a dict with the used tool names, the bundled custom tools and
+        the env-style tool parameters (UPPERCASE keys such as SERPER_API_KEY)
+        collected for the .env file.
+        """
         agents = crew.agents
         tasks = crew.tasks
 
-        # Check if any custom tools are used
-        custom_tools_used = any(tool.name in ["CustomApiTool", "CustomFileWriteTool", "CustomCodeInterpreterTool", "ScrapeWebsiteToolEnhanced", "CSVSearchToolEnhanced"] 
-                                for agent in agents for tool in agent.tools)
+        used_tool_names = {tool.name for agent in agents for tool in agent.tools}
+        custom_tools_used = sorted(used_tool_names & CUSTOM_TOOL_MODULES)
+        community_tools_used = sorted(used_tool_names & LANGCHAIN_COMMUNITY_TOOLS)
+        env_params = {}
 
         def json_dumps_python(obj):
             if isinstance(obj, bool):
@@ -43,11 +243,20 @@ class PageExportCrew:
             return json.dumps(obj)
 
         def format_tool_instance(tool):
-            tool_class = TOOL_CLASSES.get(tool.name)
-            if tool_class:
-                params = ', '.join([f'{key}={json_dumps_python(value)}' for key, value in tool.parameters.items() if value is not None])
-                return f'{tool.name}({params})' if params else f'{tool.name}()'
-            return None
+            if tool.name not in TOOL_CLASSES:
+                return None
+            ctor_params = {}
+            for key, value in tool.parameters.items():
+                if value is None:
+                    continue
+                if key.isupper():
+                    # Env-style credential (e.g. SERPER_API_KEY): belongs in
+                    # .env, never in the generated source code.
+                    env_params[key] = value
+                else:
+                    ctor_params[key] = value
+            params = ', '.join(f'{key}={json_dumps_python(value)}' for key, value in ctor_params.items())
+            return f'{tool.name}({params})'
 
         agent_definitions = ",\n        ".join([
             f"""
@@ -93,84 +302,23 @@ Task(
         if crew.planning and crew.planning_llm:
             planning_llm_definition = f'planning_llm=create_llm({json_dumps_python(crew.planning_llm)})'
         
-        app_content = f"""
+        tool_imports = "\n".join(
+            [f'from tools.{name} import {name}' for name in custom_tools_used]
+            + [f'from langchain_community.tools import {name}' for name in community_tools_used]
+        )
+
+        app_content = f"""import os
+
 import streamlit as st
-from crewai import Agent, Task, Crew, Process
-from langchain_openai import ChatOpenAI
-from langchain_groq import ChatGroq
-from langchain_anthropic import ChatAnthropic
 from dotenv import load_dotenv
-import os
-from crewai_tools import *
-{'''from tools.CustomApiTool import CustomApiTool''' if custom_tools_used else ''}
-{'''from tools.CustomFileWriteTool import CustomFileWriteTool''' if custom_tools_used else ''}
-{'''from tools.CustomCodeInterpreterTool import CustomCodeInterpreterTool''' if custom_tools_used else ''}
-{'''from tools.ScrapeWebsiteToolEnhanced import ScrapeWebsiteToolEnhanced''' if custom_tools_used else ''}
-{'''from tools.CSVSearchToolEnhanced import CSVSearchToolEnhanced''' if custom_tools_used else ''}
+
 load_dotenv()
 
-def create_lmstudio_llm(model, temperature):
-    api_base = os.getenv('LMSTUDIO_API_BASE')
-    os.environ["OPENAI_API_KEY"] = "lm-studio"
-    os.environ["OPENAI_API_BASE"] = api_base
-    if api_base:
-        return ChatOpenAI(openai_api_key='lm-studio', openai_api_base=api_base, temperature=temperature)
-    else:
-        raise ValueError("LM Studio API base not set in .env file")
+from crewai import Agent, Task, Crew, Process
+from crewai_tools import *
+from llms import create_llm
+{tool_imports}
 
-def create_openai_llm(model, temperature):
-    safe_pop_env_var('OPENAI_API_KEY')
-    safe_pop_env_var('OPENAI_API_BASE')
-    load_dotenv(override=True)
-    api_key = os.getenv('OPENAI_API_KEY')
-    api_base = os.getenv('OPENAI_API_BASE', 'https://api.openai.com/v1/')
-    if api_key:
-        return ChatOpenAI(openai_api_key=api_key, openai_api_base=api_base, model_name=model, temperature=temperature)
-    else:
-        raise ValueError("OpenAI API key not set in .env file")
-
-def create_groq_llm(model, temperature):
-    api_key = os.getenv('GROQ_API_KEY')
-    if api_key:
-        return ChatGroq(groq_api_key=api_key, model_name=model, temperature=temperature)
-    else:
-        raise ValueError("Groq API key not set in .env file")
-
-def create_anthropic_llm(model, temperature):
-    api_key = os.getenv('ANTHROPIC_API_KEY')
-    if api_key:
-        return ChatAnthropic(anthropic_api_key=api_key, model_name=model, temperature=temperature)
-    else:
-        raise ValueError("Anthropic API key not set in .env file")
-
-def safe_pop_env_var(key):
-    try:
-        os.environ.pop(key)
-    except KeyError:
-        pass
-        
-LLM_CONFIG = {{
-    "OpenAI": {{
-        "create_llm": create_openai_llm
-    }},
-    "Groq": {{
-        "create_llm": create_groq_llm
-    }},
-    "LM Studio": {{
-        "create_llm": create_lmstudio_llm
-    }},
-    "Anthropic": {{
-        "create_llm": create_anthropic_llm
-    }}
-}}
-
-def create_llm(provider_and_model, temperature=0.1):
-    provider, model = provider_and_model.split(": ")
-    create_llm_func = LLM_CONFIG.get(provider, {{}}).get("create_llm")
-    if create_llm_func:
-        return create_llm_func(model, temperature)
-    else:
-        raise ValueError(f"LLM provider {{provider}} is not recognized or not supported")
 
 def load_agents():
     agents = [
@@ -178,11 +326,13 @@ def load_agents():
     ]
     return agents
 
+
 def load_tasks(agents):
     tasks = [
         {task_definitions}
     ]
     return tasks
+
 
 def main():
     st.title({json_dumps_python(crew.name)})
@@ -190,12 +340,12 @@ def main():
     agents = load_agents()
     tasks = load_tasks(agents)
     crew = Crew(
-        agents=agents, 
-        tasks=tasks, 
-        process={json_dumps_python(crew.process)}, 
-        verbose={json_dumps_python(crew.verbose)}, 
-        memory={json_dumps_python(crew.memory)}, 
-        cache={json_dumps_python(crew.cache)}, 
+        agents=agents,
+        tasks=tasks,
+        process={json_dumps_python(crew.process)},
+        verbose={json_dumps_python(crew.verbose)},
+        memory={json_dumps_python(crew.memory)},
+        cache={json_dumps_python(crew.cache)},
         max_rpm={json_dumps_python(crew.max_rpm)},
         planning={json_dumps_python(crew.planning)},
         {manager_llm_definition}{',' if manager_llm_definition and planning_llm_definition else ''}
@@ -207,16 +357,22 @@ def main():
     placeholders = {{
         {placeholders_dict}
     }}
-    with st.spinner("Running crew..."):
-        try:
-            result = crew.kickoff(inputs=placeholders)
-            with st.expander("Final output", expanded=True):
-                if hasattr(result, 'raw'):
-                    st.write(result.raw)                
-            with st.expander("Full output", expanded=False):
-                st.write(result)
-        except Exception as e:
-            st.error(f"An error occurred: {{str(e)}}")
+
+    if st.button("Run crew", type="primary"):
+        with st.spinner("Running crew..."):
+            try:
+                st.session_state["result"] = crew.kickoff(inputs=placeholders)
+            except Exception as e:
+                st.session_state["result"] = None
+                st.error(f"An error occurred: {{str(e)}}")
+
+    result = st.session_state.get("result")
+    if result is not None:
+        with st.expander("Final output", expanded=True):
+            st.write(result.raw if hasattr(result, "raw") else result)
+        with st.expander("Full output", expanded=False):
+            st.write(result)
+
 
 if __name__ == '__main__':
     main()
@@ -225,20 +381,84 @@ if __name__ == '__main__':
             f.write(app_content)
 
         if custom_tools_used:
-            source_path = os.path.join(os.path.dirname(__file__), 'tools')
-            dest_path = os.path.join(output_dir, 'tools')
-            shutil.copytree(source_path, dest_path)
+            tools_dir = os.path.join(output_dir, 'tools')
+            os.makedirs(tools_dir, exist_ok=True)
+            source_dir = os.path.join(os.path.dirname(__file__), 'tools')
+            for name in custom_tools_used:
+                shutil.copy2(os.path.join(source_dir, f'{name}.py'), tools_dir)
 
-    def create_env_file(self, output_dir):
-        env_content = """
-# OPENAI_API_KEY="FILL-IN-YOUR-OPENAI-API-KEY"
-# OPENAI_API_BASE="OPTIONAL-FILL-IN-YOUR-OPENAI-API-BASE"
-# GROQ_API_KEY="FILL-IN-YOUR-GROQ-API-KEY"
-# ANTHROPIC_API_KEY="FILL-IN-YOUR-ANTHROPIC-API-KEY"
-# LMSTUDIO_API_BASE="http://localhost:1234/v1"
-"""
+        return {
+            'used_tool_names': used_tool_names,
+            'custom_tools_used': custom_tools_used,
+            'env_params': env_params,
+        }
+
+    def create_env_file(self, output_dir, env_params=None):
+        lines = [
+            '# LLM provider credentials — uncomment and fill in what your crew uses.',
+            '# OPENAI_API_KEY="FILL-IN-YOUR-OPENAI-API-KEY"',
+            '# OPENAI_API_BASE="OPTIONAL-FILL-IN-YOUR-OPENAI-API-BASE"',
+            '# GROQ_API_KEY="FILL-IN-YOUR-GROQ-API-KEY"',
+            '# ANTHROPIC_API_KEY="FILL-IN-YOUR-ANTHROPIC-API-KEY"',
+            '# OLLAMA_HOST="http://localhost:11434"',
+            '# LMSTUDIO_API_BASE="http://localhost:1234/v1"',
+            '# XAI_API_KEY="FILL-IN-YOUR-XAI-API-KEY"',
+            '# DEFAULT_LANGUAGE="en"',
+        ]
+        if env_params:
+            lines += [
+                '',
+                '# Tool credentials exported from CrewAI Studio.',
+            ]
+            lines += [f'{key}={json.dumps(value)}' for key, value in sorted(env_params.items())]
         with open(os.path.join(output_dir, '.env'), 'w') as f:
-            f.write(env_content)
+            f.write('\n'.join(lines) + '\n')
+
+    def create_support_modules(self, output_dir, custom_tools_used):
+        """Write the bundled llms.py and (when custom tools ship) the i18n module."""
+        with open(os.path.join(output_dir, 'llms.py'), 'w') as f:
+            f.write(EXPORT_LLMS_PY)
+
+        if custom_tools_used:
+            # The bundled custom tools translate their names/descriptions via i18n.
+            with open(os.path.join(output_dir, 'i18n.py'), 'w') as f:
+                f.write(EXPORT_I18N_PY)
+            source_dir = os.path.join(os.path.dirname(__file__), 'i18n')
+            dest_dir = os.path.join(output_dir, 'i18n')
+            os.makedirs(dest_dir, exist_ok=True)
+            for lang_file in os.listdir(source_dir):
+                if lang_file.endswith('.json'):
+                    shutil.copy2(os.path.join(source_dir, lang_file), dest_dir)
+
+    def create_requirements_file(self, output_dir, used_tool_names):
+        """Generate a minimal requirements.txt for the standalone app.
+
+        Versions are pinned to what the Studio itself runs with (taken from
+        the Studio's requirements.txt) when available.
+        """
+        pins = {}
+        studio_requirements = os.path.join(os.path.dirname(__file__), '..', 'requirements.txt')
+        try:
+            with open(studio_requirements) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    match = re.match(r'^([A-Za-z0-9._-]+)\s*==', line)
+                    if match:
+                        pins[match.group(1).lower().replace('_', '-')] = line
+        except OSError:
+            pass
+
+        packages = list(EXPORT_BASE_REQUIREMENTS)
+        for tool_name in sorted(used_tool_names):
+            for package in EXPORT_TOOL_REQUIREMENTS.get(tool_name, []):
+                if package not in packages:
+                    packages.append(package)
+
+        lines = [pins.get(package, package) for package in packages]
+        with open(os.path.join(output_dir, 'requirements.txt'), 'w') as f:
+            f.write('\n'.join(lines) + '\n')
 
     def create_shell_scripts(self, output_dir):
         install_sh_content = """
@@ -317,11 +537,6 @@ streamlit run app.py --server.headless true
         with open(os.path.join(output_dir, 'run.bat'), 'w') as f:
             f.write(run_bat_content)
 
-        # Copy the main project's requirements.txt
-        source_requirements = os.path.join(os.path.dirname(__file__), '..', 'requirements.txt')
-        dest_requirements = os.path.join(output_dir, 'requirements.txt')
-        shutil.copy2(source_requirements, dest_requirements)
-
     def zip_directory(self, folder_path, output_path):
         with zipfile.ZipFile(output_path, 'w') as zip_file:
             for foldername, subfolders, filenames in os.walk(folder_path):
@@ -331,19 +546,25 @@ streamlit run app.py --server.headless true
                     zip_file.write(file_path, arcname)
 
     def create_export(self, crew_name):
-        output_dir = f"{crew_name}_app"
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
         selected_crew = next((crew for crew in ss.crews if crew.name == crew_name), None)
-        if selected_crew:
-            self.generate_streamlit_app(selected_crew, output_dir)
-            self.create_env_file(output_dir)
-            self.create_shell_scripts(output_dir)
+        if not selected_crew:
+            return None
 
-            zip_path = f"{crew_name}_app.zip"
-            self.zip_directory(output_dir, zip_path)
-            return zip_path
+        output_dir = f"{crew_name}_app"
+        if os.path.exists(output_dir):
+            # Stale files from a previous export must not leak into the zip.
+            shutil.rmtree(output_dir)
+        os.makedirs(output_dir)
+
+        export_info = self.generate_streamlit_app(selected_crew, output_dir)
+        self.create_support_modules(output_dir, export_info['custom_tools_used'])
+        self.create_requirements_file(output_dir, export_info['used_tool_names'])
+        self.create_env_file(output_dir, export_info['env_params'])
+        self.create_shell_scripts(output_dir)
+
+        zip_path = f"{crew_name}_app.zip"
+        self.zip_directory(output_dir, zip_path)
+        return zip_path
 
     def export_crew_to_json(self, crew):
         crew_data = {

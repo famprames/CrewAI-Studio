@@ -1,5 +1,8 @@
 # CrewAI Studio
 
+> [!NOTE]
+> **Maintenance status:** This project is in low-maintenance mode. The author is not actively developing new features, but the project is not abandoned — security fixes and critical bug fixes still happen, and **pull requests are very welcome**. If you'd like to add a feature or fix something, go for it; reasonable PRs get reviewed and merged.
+
 Welcome to CrewAI Studio! This application provides a user-friendly interface written in Streamlit for interacting with CrewAI, suitable even for those who don't want to write any code. Follow the steps below to install and run the application using Docker/docker-compose or Conda/venv.
 
 ## Features

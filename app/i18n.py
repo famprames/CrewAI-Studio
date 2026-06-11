@@ -93,6 +93,21 @@ def t(key: str, **kwargs):
     return translation
 
 
+def get_tool_label_variants(i18n_key: str):
+    """Return the `tool.<i18n_key>` translation in every available language.
+
+    Used to map historic (translated) tool names back to stable tool
+    identifiers. Does not require a Streamlit session.
+    """
+    _load_translations()
+    variants = []
+    for translations in _translations.values():
+        value = translations.get("tool", {}).get(i18n_key)
+        if isinstance(value, str) and value not in variants:
+            variants.append(value)
+    return variants
+
+
 def setup_language_selector():
     """Setup language selector in the sidebar."""
     with st.sidebar:

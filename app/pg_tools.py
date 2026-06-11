@@ -35,7 +35,7 @@ class PageTools:
     def get_tool_display_name(self, tool):
         first_param_name = tool.get_parameter_names()[0] if tool.get_parameter_names() else None
         first_param_value = tool.parameters.get(first_param_name, '') if first_param_name else ''
-        return f"{tool.name} ({first_param_value if first_param_value else tool.tool_id})"
+        return f"{tool.display_name} ({first_param_value if first_param_value else tool.tool_id})"
 
     def draw_tools(self):
         c1,c2 = st.columns([1, 3])
@@ -45,7 +45,7 @@ class PageTools:
                 tool_class = self.available_tools[tool_name]
                 tool_instance = tool_class()
                 tool_description = tool_instance.description
-                if st.button(f"{tool_name}", key=f"enable_{tool_name}", help=tool_description):
+                if st.button(f"{tool_instance.display_name}", key=f"enable_{tool_name}", help=tool_description):
                     self.create_tool(tool_name)
         with c2:
             if 'tools' in ss:

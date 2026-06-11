@@ -173,7 +173,8 @@
     "export_singlepage": "导出单页应用",
     "download_app": "下载导出的应用",
     "export_crew": "导出团队为 JSON",
-    "download_crew": "下载团队 JSON"
+    "download_crew": "下载团队 JSON",
+    "unknown_tool": "已跳过导入文件中的未知工具 '{name}'。"
   },
   "message": {
     "success": "成功!",
@@ -274,7 +275,6 @@
     "success_status": "成功",
     "http_method": "要使用的 HTTP 方法 (GET, POST, PUT, DELETE)",
     "http_headers": "要在请求中包含的 HTTP 标头",
-    "query_params": "请求的查询参数",
     "request_body": "POST/PUT 方法的请求体",
     "file_content": "要写入或追加到文件的内容",
     "file_mode": "打开文件的模式，为 'w' 或 'a'",
@@ -300,6 +300,24 @@
     "error_no_csv_file": "未提供 CSV 文件",
     "error_code_or_script_required": "必须提供代码或运行脚本",
     "error_code_or_script_only_one": "只能提供代码或运行脚本中的一个",
-    "error_search": "搜索错误"
+    "error_search": "搜索错误",
+    "docx_search": "DOCX 搜索工具",
+    "docx_search_desc": "用于对 DOCX 内容进行语义搜索的工具。",
+    "exa_search": "EXA 搜索工具",
+    "exa_search_desc": "使用搜索查询在互联网上进行搜索的工具。",
+    "github_search": "GitHub 搜索工具",
+    "github_search_desc": "用于对 GitHub 仓库内容进行语义搜索的工具。有效的 content_types：code,repo,pr,issue（以逗号分隔）",
+    "json_search": "JSON 搜索工具",
+    "json_search_desc": "用于对 JSON 内容进行语义搜索的工具。",
+    "mdx_search": "MDX 搜索工具",
+    "mdx_search_desc": "用于对 MDX 内容进行语义搜索的工具。",
+    "selenium_scraping": "Selenium 网页爬取工具",
+    "selenium_scraping_desc": "用于读取网站特定部分内容的工具。CSS 元素以逗号分隔，Cookie 格式为 {key1:value1},{key2:value2}",
+    "txt_search": "TXT 搜索工具",
+    "txt_search_desc": "用于对 TXT 内容进行语义搜索的工具。",
+    "scrape_element_from_website": "网页元素爬取工具",
+    "scrape_element_from_website_desc": "用于读取网站特定部分内容的工具。CSS 元素以逗号分隔，Cookie 格式为 {key1:value1},{key2:value2}",
+    "yahoo_finance_news": "雅虎财经新闻工具",
+    "yahoo_finance_news_desc": "用于搜索雅虎财经新闻的工具。"
   }
 }

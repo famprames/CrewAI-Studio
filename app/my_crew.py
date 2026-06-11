@@ -338,7 +338,7 @@ class MyCrew:
                         async_tag = t("crew.async_tag") if task.async_execution else ""
                         st.markdown(f"**{i}.{async_tag}  {task.description}**")
                         st.markdown(f"**{t('task.agent')}:** {task.agent.role if task.agent else 'None'}")
-                        tools_list = ", ".join([tool.name for tool in task.agent.tools]) if task.agent else "None"
+                        tools_list = ", ".join([tool.display_name for tool in task.agent.tools]) if task.agent else "None"
                         st.markdown(f" **{t('agent.tools')}:** {tools_list}")
                         st.markdown(f" **LLM:** {task.agent.llm_provider_model}")
                 if self.knowledge_source_ids and 'knowledge_sources' in ss:

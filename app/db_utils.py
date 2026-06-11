@@ -1,8 +1,11 @@
 import sqlite3
 import os
 import json
-from my_tools import TOOL_CLASSES
+import logging
+from my_tools import TOOL_CLASSES, resolve_tool_id
 from sqlalchemy import create_engine, text
+
+logger = logging.getLogger(__name__)
 
 # If you have an environment variable DB_URL for Postgres, use that. 
 # Otherwise, fallback to local SQLite file: 'sqlite:///crewai.db'
@@ -245,9 +248,26 @@ def load_tools():
     tools = []
     for row in rows:
         data = row[1]
-        tool_class = TOOL_CLASSES[data['name']]
+        stored_name = data.get('name')
+        stable_name = resolve_tool_id(stored_name)
+        if stable_name is None:
+            # Tool saved by an unknown/removed version — skip it instead
+            # of crashing the whole app with a KeyError (issues #115, #116).
+            logger.warning(
+                "Skipping unknown tool '%s' (id=%s) stored in the database.",
+                stored_name, row[0]
+            )
+            continue
+        tool_class = TOOL_CLASSES[stable_name]
         tool = tool_class(tool_id=row[0])
         tool.set_parameters(**data['parameters'])
+        if stored_name != stable_name:
+            # Self-heal records persisted with a translated/legacy name.
+            logger.info(
+                "Migrating tool '%s' (id=%s) to stable name '%s'.",
+                stored_name, row[0], stable_name
+            )
+            save_tool(tool)
         tools.append(tool)
     return tools
 

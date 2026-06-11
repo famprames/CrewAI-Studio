@@ -7,7 +7,7 @@ import json
 import shutil
 import db_utils
 from utils import escape_quotes
-from my_tools import TOOL_CLASSES
+from my_tools import TOOL_CLASSES, resolve_tool_id
 from crewai import Process
 from my_crew import MyCrew
 from my_agent import MyAgent
@@ -412,7 +412,13 @@ streamlit run app.py --server.headless true
     def import_crew_from_json(self, crew_data):
         # Create tools
         for tool_data in crew_data['tools']:
-            tool_class = TOOL_CLASSES[tool_data['name']]
+            stable_name = resolve_tool_id(tool_data['name'])
+            if stable_name is None:
+                # Tool exported by an unknown/removed version — skip it
+                # instead of failing the whole import with a KeyError.
+                st.warning(t("export.unknown_tool", name=tool_data['name']))
+                continue
+            tool_class = TOOL_CLASSES[stable_name]
             tool = tool_class(tool_id=tool_data['tool_id'])
             tool.set_parameters(**tool_data['parameters'])
             if tool not in ss.tools:
@@ -435,7 +441,10 @@ streamlit run app.py --server.headless true
                 max_iter=agent_data['max_iter'],
                 created_at=agent_data.get('created_at')
             )
-            agent.tools = [next(tool for tool in ss.tools if tool.tool_id == tool_id) for tool_id in agent_data['tool_ids']]
+            # Tolerate tool ids that could not be imported (unknown tools
+            # are skipped above) instead of raising StopIteration.
+            tools_by_id = {tool.tool_id: tool for tool in ss.tools}
+            agent.tools = [tools_by_id[tool_id] for tool_id in agent_data['tool_ids'] if tool_id in tools_by_id]
             agents.append(agent)
             db_utils.save_agent(agent)
 

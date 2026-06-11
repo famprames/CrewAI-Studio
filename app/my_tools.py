@@ -12,15 +12,33 @@ from tools.ScrapflyScrapeWebsiteTool import ScrapflyScrapeWebsiteTool
 from tools.DuckDuckGoSearchTool import DuckDuckGoSearchTool
 
 from langchain_community.tools import YahooFinanceNewsTool
-from i18n import t
+from i18n import t, get_tool_label_variants
 
 class MyTool:
     def __init__(self, tool_id, name, description, parameters, **kwargs):
         self.tool_id = tool_id or rnd_id()
+        # `name` is the STABLE internal identifier of the tool type.
+        # It is a key of TOOL_CLASSES, it is persisted in the database and
+        # it must NEVER be translated. Use `display_name` for anything
+        # shown in the UI.
         self.name = name
         self.description = description
         self.parameters = kwargs
         self.parameters_metadata = parameters
+
+    @property
+    def display_name(self):
+        """Translated, human-readable label for the UI.
+
+        Never use this value as a lookup key — use `name` for that.
+        Falls back to the stable internal name when no translation exists.
+        """
+        i18n_key = TOOL_I18N_KEYS.get(self.name)
+        if i18n_key:
+            label = t(f'tool.{i18n_key}')
+            if label != f'tool.{i18n_key}':
+                return label
+        return self.name
 
     def create_tool(self):
         pass
@@ -41,7 +59,7 @@ class MyTool:
         for param_name, metadata in self.parameters_metadata.items():
             if metadata['mandatory'] and not self.parameters.get(param_name):
                 if show_warning:
-                    st.warning(t('warning.parameter_mandatory', param=param_name, tool=self.name))
+                    st.warning(t('warning.parameter_mandatory', param=param_name, tool=self.display_name))
                 return False
         return True
 
@@ -50,7 +68,7 @@ class MyScrapeWebsiteTool(MyTool):
         parameters = {
             'website_url': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.scrape_website'), t('tool.scrape_website_desc'), parameters, website_url=website_url)
+        super().__init__(tool_id, 'ScrapeWebsiteTool', t('tool.scrape_website_desc'), parameters, website_url=website_url)
 
     def create_tool(self) -> ScrapeWebsiteTool:
         return ScrapeWebsiteTool(self.parameters.get('website_url') if self.parameters.get('website_url') else None)
@@ -60,7 +78,7 @@ class MyFileReadTool(MyTool):
         parameters = {
             'file_path': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.file_read'), t('tool.file_read_desc'), parameters, file_path=file_path)
+        super().__init__(tool_id, 'FileReadTool', t('tool.file_read_desc'), parameters, file_path=file_path)
 
     def create_tool(self) -> FileReadTool:
         return FileReadTool(self.parameters.get('file_path') if self.parameters.get('file_path') else None)
@@ -70,7 +88,7 @@ class MyDirectorySearchTool(MyTool):
         parameters = {
             'directory': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.directory_search'), t('tool.directory_search_desc'), parameters, directory_path=directory)
+        super().__init__(tool_id, 'DirectorySearchTool', t('tool.directory_search_desc'), parameters, directory_path=directory)
 
     def create_tool(self) -> DirectorySearchTool:
         return DirectorySearchTool(self.parameters.get('directory') if self.parameters.get('directory') else None)
@@ -80,7 +98,7 @@ class MyDirectoryReadTool(MyTool):
         parameters = {
             'directory_contents': {'mandatory': True}
         }
-        super().__init__(tool_id, t('tool.directory_read'), t('tool.directory_read_desc'), parameters, directory_contents=directory_contents)
+        super().__init__(tool_id, 'DirectoryReadTool', t('tool.directory_read_desc'), parameters, directory_contents=directory_contents)
 
     def create_tool(self) -> DirectoryReadTool:
         return DirectoryReadTool(self.parameters.get('directory_contents'))
@@ -90,7 +108,7 @@ class MyCodeDocsSearchTool(MyTool):
         parameters = {
             'code_docs': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.code_docs_search'), t('tool.code_docs_search_desc'), parameters, code_docs=code_docs)
+        super().__init__(tool_id, 'CodeDocsSearchTool', t('tool.code_docs_search_desc'), parameters, code_docs=code_docs)
 
     def create_tool(self) -> CodeDocsSearchTool:
         return CodeDocsSearchTool(self.parameters.get('code_docs') if self.parameters.get('code_docs') else None)
@@ -100,7 +118,7 @@ class MyYoutubeVideoSearchTool(MyTool):
         parameters = {
             'youtube_video_url': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.youtube_video_search'), t('tool.youtube_video_search_desc'), parameters, youtube_video_url=youtube_video_url)
+        super().__init__(tool_id, 'YoutubeVideoSearchTool', t('tool.youtube_video_search_desc'), parameters, youtube_video_url=youtube_video_url)
 
     def create_tool(self) -> YoutubeVideoSearchTool:
         return YoutubeVideoSearchTool(self.parameters.get('youtube_video_url') if self.parameters.get('youtube_video_url') else None)
@@ -111,7 +129,7 @@ class MySerperDevTool(MyTool):
             'SERPER_API_KEY': {'mandatory': True}
         }
 
-        super().__init__(tool_id, t('tool.serper_dev'), t('tool.serper_dev_desc'), parameters)
+        super().__init__(tool_id, 'SerperDevTool', t('tool.serper_dev_desc'), parameters)
 
     def create_tool(self) -> SerperDevTool:
         os.environ['SERPER_API_KEY'] = self.parameters.get('SERPER_API_KEY')
@@ -122,7 +140,7 @@ class MyYoutubeChannelSearchTool(MyTool):
         parameters = {
             'youtube_channel_handle': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.youtube_channel_search'), t('tool.youtube_channel_search_desc'), parameters, youtube_channel_handle=youtube_channel_handle)
+        super().__init__(tool_id, 'YoutubeChannelSearchTool', t('tool.youtube_channel_search_desc'), parameters, youtube_channel_handle=youtube_channel_handle)
 
     def create_tool(self) -> YoutubeChannelSearchTool:
         return YoutubeChannelSearchTool(self.parameters.get('youtube_channel_handle') if self.parameters.get('youtube_channel_handle') else None)
@@ -132,7 +150,7 @@ class MyWebsiteSearchTool(MyTool):
         parameters = {
             'website': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.website_search'), t('tool.website_search_desc'), parameters, website=website)
+        super().__init__(tool_id, 'WebsiteSearchTool', t('tool.website_search_desc'), parameters, website=website)
 
     def create_tool(self) -> WebsiteSearchTool:
         return WebsiteSearchTool(self.parameters.get('website') if self.parameters.get('website') else None)
@@ -142,7 +160,7 @@ class MyCSVSearchTool(MyTool):
         parameters = {
             'csv': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.csv_search'), t('tool.csv_search_desc'), parameters, csv=csv)
+        super().__init__(tool_id, 'CSVSearchTool', t('tool.csv_search_desc'), parameters, csv=csv)
 
     def create_tool(self) -> CSVSearchTool:
         return CSVSearchTool(csv=self.parameters.get('csv') if self.parameters.get('csv') else None)
@@ -152,7 +170,7 @@ class MyDocxSearchTool(MyTool):
         parameters = {
             'docx': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.docx_search'), t('tool.docx_search_desc'), parameters, docx=docx)
+        super().__init__(tool_id, 'DOCXSearchTool', t('tool.docx_search_desc'), parameters, docx=docx)
 
     def create_tool(self) -> DOCXSearchTool:
         return DOCXSearchTool(docx=self.parameters.get('docx') if self.parameters.get('docx') else None)
@@ -162,7 +180,7 @@ class MyEXASearchTool(MyTool):
         parameters = {
             'EXA_API_KEY': {'mandatory': True}
         }
-        super().__init__(tool_id, t('tool.exa_search'), t('tool.exa_search_desc'), parameters, EXA_API_KEY=EXA_API_KEY)
+        super().__init__(tool_id, 'EXASearchTool', t('tool.exa_search_desc'), parameters, EXA_API_KEY=EXA_API_KEY)
 
     def create_tool(self) -> EXASearchTool:
         os.environ['EXA_API_KEY'] = self.parameters.get('EXA_API_KEY')
@@ -175,7 +193,7 @@ class MyGithubSearchTool(MyTool):
             'gh_token': {'mandatory': True},
             'content_types': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.github_search'), t('tool.github_search_desc'), parameters, github_repo=github_repo, gh_token=gh_token, content_types=content_types)
+        super().__init__(tool_id, 'GithubSearchTool', t('tool.github_search_desc'), parameters, github_repo=github_repo, gh_token=gh_token, content_types=content_types)
 
     def create_tool(self) -> GithubSearchTool:
         return GithubSearchTool(
@@ -189,7 +207,7 @@ class MyJSONSearchTool(MyTool):
         parameters = {
             'json_path': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.json_search'), t('tool.json_search_desc'), parameters, json_path=json_path)
+        super().__init__(tool_id, 'JSONSearchTool', t('tool.json_search_desc'), parameters, json_path=json_path)
 
     def create_tool(self) -> JSONSearchTool:
         return JSONSearchTool(json_path=self.parameters.get('json_path') if self.parameters.get('json_path') else None)
@@ -199,7 +217,7 @@ class MyMDXSearchTool(MyTool):
         parameters = {
             'mdx': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.mdx_search'), t('tool.mdx_search_desc'), parameters, mdx=mdx)
+        super().__init__(tool_id, 'MDXSearchTool', t('tool.mdx_search_desc'), parameters, mdx=mdx)
 
     def create_tool(self) -> MDXSearchTool:
         return MDXSearchTool(mdx=self.parameters.get('mdx') if self.parameters.get('mdx') else None)
@@ -209,7 +227,7 @@ class MyPDFSearchTool(MyTool):
         parameters = {
             'pdf': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.pdf_search'), t('tool.pdf_search_desc'), parameters, pdf=pdf)
+        super().__init__(tool_id, 'PDFSearchTool', t('tool.pdf_search_desc'), parameters, pdf=pdf)
 
     def create_tool(self) -> PDFSearchTool:
         return PDFSearchTool(self.parameters.get('pdf') if self.parameters.get('pdf') else None)
@@ -224,7 +242,7 @@ class MySeleniumScrapingTool(MyTool):
         }
         super().__init__(
             tool_id,
-            t('tool.selenium_scraping'),
+            'SeleniumScrapingTool',
             t('tool.selenium_scraping_desc'),
             parameters,
             website_url=website_url,
@@ -247,7 +265,7 @@ class MyTXTSearchTool(MyTool):
         parameters = {
             'txt': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.txt_search'), t('tool.txt_search_desc'), parameters, txt=txt)
+        super().__init__(tool_id, 'TXTSearchTool', t('tool.txt_search_desc'), parameters, txt=txt)
 
     def create_tool(self) -> TXTSearchTool:
         return TXTSearchTool(self.parameters.get('txt'))
@@ -261,7 +279,7 @@ class MyScrapeElementFromWebsiteTool(MyTool):
         }
         super().__init__(
             tool_id,
-            t('tool.scrape_element_from_website'),
+            'ScrapeElementFromWebsiteTool',
             t('tool.scrape_element_from_website_desc'),
             parameters,
             website_url=website_url,
@@ -280,7 +298,7 @@ class MyScrapeElementFromWebsiteTool(MyTool):
 class MyYahooFinanceNewsTool(MyTool):
     def __init__(self, tool_id=None):
         parameters = {}
-        super().__init__(tool_id, t('tool.yahoo_finance_news'), t('tool.yahoo_finance_news_desc'), parameters)
+        super().__init__(tool_id, 'YahooFinanceNewsTool', t('tool.yahoo_finance_news_desc'), parameters)
 
     def create_tool(self) -> YahooFinanceNewsTool:
         return YahooFinanceNewsTool()
@@ -292,7 +310,7 @@ class MyCustomApiTool(MyTool):
             'headers': {'mandatory': False},
             'query_params': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.custom_api'), t('tool.custom_api_desc'), parameters, base_url=base_url, headers=headers, query_params=query_params)
+        super().__init__(tool_id, 'CustomApiTool', t('tool.custom_api_desc'), parameters, base_url=base_url, headers=headers, query_params=query_params)
 
     def create_tool(self) -> CustomApiTool:
         return CustomApiTool(
@@ -307,7 +325,7 @@ class MyCustomFileWriteTool(MyTool):
             'base_folder': {'mandatory': True},
             'filename': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.custom_file_write'), t('tool.custom_file_write_desc'), parameters,base_folder=base_folder, filename=filename)
+        super().__init__(tool_id, 'CustomFileWriteTool', t('tool.custom_file_write_desc'), parameters,base_folder=base_folder, filename=filename)
 
     def create_tool(self) -> CustomFileWriteTool:
         return CustomFileWriteTool(
@@ -319,7 +337,7 @@ class MyCustomFileWriteTool(MyTool):
 class MyDuckDuckGoSearchTool(MyTool):
     def __init__(self, tool_id=None):
         parameters = {}
-        super().__init__(tool_id, t('tool.duckduckgo_search'), t('tool.duckduckgo_search_desc'), parameters)
+        super().__init__(tool_id, 'DuckDuckGoSearchTool', t('tool.duckduckgo_search_desc'), parameters)
 
     def create_tool(self) -> DuckDuckGoSearchTool:
         return DuckDuckGoSearchTool()
@@ -328,7 +346,7 @@ class MyDuckDuckGoSearchTool(MyTool):
 class MyCodeInterpreterTool(MyTool):
     def __init__(self, tool_id=None):
         parameters = {}
-        super().__init__(tool_id, t('tool.code_interpreter'), t('tool.code_interpreter_desc'), parameters)
+        super().__init__(tool_id, 'CodeInterpreterTool', t('tool.code_interpreter_desc'), parameters)
 
     def create_tool(self) -> CodeInterpreterTool:
         return CodeInterpreterTool()
@@ -339,7 +357,7 @@ class MyCustomCodeInterpreterTool(MyTool):
         parameters = {
             'workspace_dir': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.custom_code_interpreter'), t('tool.custom_code_interpreter_desc'), parameters, workspace_dir=workspace_dir)
+        super().__init__(tool_id, 'CustomCodeInterpreterTool', t('tool.custom_code_interpreter_desc'), parameters, workspace_dir=workspace_dir)
 
     def create_tool(self) -> CustomCodeInterpreterTool:
         return CustomCodeInterpreterTool(workspace_dir=self.parameters.get('workspace_dir') if self.parameters.get('workspace_dir') else "workspace")
@@ -349,7 +367,7 @@ class MyCSVSearchToolEnhanced(MyTool):
         parameters = {
             'csv': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.csv_search_enhanced'), t('tool.csv_search_enhanced_desc'), parameters, csv=csv)
+        super().__init__(tool_id, 'CSVSearchToolEnhanced', t('tool.csv_search_enhanced_desc'), parameters, csv=csv)
 
     def create_tool(self) -> CSVSearchToolEnhanced:
         return CSVSearchToolEnhanced(csv=self.parameters.get('csv') if self.parameters.get('csv') else None)
@@ -362,7 +380,7 @@ class MyScrapeWebsiteToolEnhanced(MyTool):
             'show_urls': {'mandatory': False},
             'css_selector': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.scrape_website_enhanced'), t('tool.scrape_website_enhanced_desc'), parameters, website_url=website_url, cookies=cookies, show_urls=show_urls, css_selector=css_selector)
+        super().__init__(tool_id, 'ScrapeWebsiteToolEnhanced', t('tool.scrape_website_enhanced_desc'), parameters, website_url=website_url, cookies=cookies, show_urls=show_urls, css_selector=css_selector)
 
     def create_tool(self) -> ScrapeWebsiteToolEnhanced:
         return ScrapeWebsiteToolEnhanced(
@@ -377,7 +395,7 @@ class MyScrapflyScrapeWebsiteTool(MyTool):
         parameters = {
             'api_key': {'mandatory': False}
         }
-        super().__init__(tool_id, t('tool.scrapfly_scrape_website'), t('tool.scrapfly_scrape_website_desc'), parameters, api_key=api_key)
+        super().__init__(tool_id, 'ScrapflyScrapeWebsiteTool', t('tool.scrapfly_scrape_desc'), parameters, api_key=api_key)
 
     def create_tool(self) -> ScrapflyScrapeWebsiteTool:
         api_key = self.parameters.get('api_key') or os.getenv('SCRAPFLY_API_KEY')
@@ -387,7 +405,11 @@ class MyScrapflyScrapeWebsiteTool(MyTool):
             api_key=api_key
         )
 
-# Register all tools here
+# Register all tools here.
+# The keys are STABLE internal tool identifiers: they are persisted in the
+# database (see db_utils.save_tool / load_tools) and in crew JSON exports,
+# so they must never be translated or renamed. UI labels are resolved
+# separately via TOOL_I18N_KEYS / MyTool.display_name.
 TOOL_CLASSES = {
     'DuckDuckGoSearchTool': MyDuckDuckGoSearchTool,
     'SerperDevTool': MySerperDevTool,
@@ -421,3 +443,85 @@ TOOL_CLASSES = {
     'MDXSearchTool': MyMDXSearchTool,
     'PDFSearchTool': MyPDFSearchTool
 }
+
+# Maps stable tool identifiers (TOOL_CLASSES keys) to i18n keys used for
+# the translated UI label (`tool.<key>`) and description (`tool.<key>_desc`).
+TOOL_I18N_KEYS = {
+    'DuckDuckGoSearchTool': 'duckduckgo_search',
+    'SerperDevTool': 'serper_dev',
+    'WebsiteSearchTool': 'website_search',
+    'ScrapeWebsiteTool': 'scrape_website',
+    'ScrapeWebsiteToolEnhanced': 'scrape_website_enhanced',
+    'ScrapflyScrapeWebsiteTool': 'scrapfly_scrape',
+    'SeleniumScrapingTool': 'selenium_scraping',
+    'ScrapeElementFromWebsiteTool': 'scrape_element_from_website',
+    'CustomApiTool': 'custom_api',
+    'CodeInterpreterTool': 'code_interpreter',
+    'CustomCodeInterpreterTool': 'custom_code_interpreter',
+    'FileReadTool': 'file_read',
+    'CustomFileWriteTool': 'custom_file_write',
+    'DirectorySearchTool': 'directory_search',
+    'DirectoryReadTool': 'directory_read',
+    'YoutubeVideoSearchTool': 'youtube_video_search',
+    'YoutubeChannelSearchTool': 'youtube_channel_search',
+    'GithubSearchTool': 'github_search',
+    'CodeDocsSearchTool': 'code_docs_search',
+    'YahooFinanceNewsTool': 'yahoo_finance_news',
+    'TXTSearchTool': 'txt_search',
+    'CSVSearchTool': 'csv_search',
+    'CSVSearchToolEnhanced': 'csv_search_enhanced',
+    'DOCXSearchTool': 'docx_search',
+    'EXASearchTool': 'exa_search',
+    'JSONSearchTool': 'json_search',
+    'MDXSearchTool': 'mdx_search',
+    'PDFSearchTool': 'pdf_search',
+}
+
+# Historic name variants that may still be stored in user databases or
+# crew JSON exports created with older versions of CrewAI Studio.
+# Before the i18n support the persisted name was always the stable
+# identifier, but between the i18n introduction and this fix the
+# *translated* label (or even a raw `tool.<key>` string when the
+# translation was missing) was persisted instead.
+_LEGACY_NAME_OVERRIDES = {
+    # my_tools.py used a `tool.scrapfly_scrape_website` key that never
+    # existed in the translation files (they have `scrapfly_scrape`),
+    # so the raw key string ended up persisted as the tool name.
+    'tool.scrapfly_scrape_website': 'ScrapflyScrapeWebsiteTool',
+}
+
+
+def _build_legacy_name_map():
+    """Build a mapping of every known historic tool name to its stable ID.
+
+    Covers, for each tool:
+      * the raw `tool.<i18n_key>` string (persisted when a translation
+        was missing),
+      * the translated label in every available language (persisted by
+        versions where MyTool.name was translated).
+    """
+    mapping = dict(_LEGACY_NAME_OVERRIDES)
+    for stable_id, i18n_key in TOOL_I18N_KEYS.items():
+        mapping[f'tool.{i18n_key}'] = stable_id
+        for label in get_tool_label_variants(i18n_key):
+            # Never let a translated label shadow a stable identifier.
+            if label and label not in TOOL_CLASSES:
+                mapping[label] = stable_id
+    return mapping
+
+
+_LEGACY_TOOL_NAMES = None
+
+
+def resolve_tool_id(name):
+    """Resolve a persisted tool name to a stable TOOL_CLASSES key.
+
+    Returns the stable identifier, or None when the name is unknown
+    (callers should skip such tools gracefully instead of crashing).
+    """
+    if name in TOOL_CLASSES:
+        return name
+    global _LEGACY_TOOL_NAMES
+    if _LEGACY_TOOL_NAMES is None:
+        _LEGACY_TOOL_NAMES = _build_legacy_name_map()
+    return _LEGACY_TOOL_NAMES.get(name)

@@ -173,7 +173,8 @@
     "export_singlepage": "Export singlepage app",
     "download_app": "Download Exported App",
     "export_crew": "Export crew to JSON",
-    "download_crew": "Download Crew JSON"
+    "download_crew": "Download Crew JSON",
+    "unknown_tool": "Skipped unknown tool '{name}' from the imported file."
   },
   "message": {
     "success": "Success!",
@@ -274,7 +275,6 @@
     "success_status": "success",
     "http_method": "HTTP method to use (GET, POST, PUT, DELETE)",
     "http_headers": "HTTP headers to include in the request",
-    "query_params": "Query parameters for the request",
     "request_body": "Body of the request for POST/PUT methods",
     "file_content": "The content to write or append to the file",
     "file_mode": "Mode to open the file in, either 'w' or 'a'",
@@ -300,6 +300,24 @@
     "error_no_csv_file": "No CSV file provided",
     "error_code_or_script_required": "Either code or run_script must be provided",
     "error_code_or_script_only_one": "Only one of code or run_script can be provided",
-    "error_search": "Search error"
+    "error_search": "Search error",
+    "docx_search": "DOCX Search",
+    "docx_search_desc": "A tool that can be used to semantic search a query from a DOCX's content.",
+    "exa_search": "EXA Search",
+    "exa_search_desc": "A tool that can be used to search the internet from a search_query",
+    "github_search": "GitHub Search",
+    "github_search_desc": "A tool that can be used to semantic search a query from a Github repository's content. Valid content_types: code,repo,pr,issue (comma separated)",
+    "json_search": "JSON Search",
+    "json_search_desc": "A tool that can be used to semantic search a query from a JSON's content.",
+    "mdx_search": "MDX Search",
+    "mdx_search_desc": "A tool that can be used to semantic search a query from a MDX's content.",
+    "selenium_scraping": "Selenium Scraping",
+    "selenium_scraping_desc": "A tool that can be used to read a specific part of website content. CSS elements are separated by comma, cookies are in format {key1:value1},{key2:value2}",
+    "txt_search": "TXT Search",
+    "txt_search_desc": "A tool that can be used to semantic search a query from a TXT's content.",
+    "scrape_element_from_website": "Scrape Element From Website",
+    "scrape_element_from_website_desc": "A tool that can be used to read a specific part of website content. CSS elements are separated by comma, cookies are in format {key1:value1},{key2:value2}",
+    "yahoo_finance_news": "Yahoo Finance News",
+    "yahoo_finance_news_desc": "A tool that can be used to search Yahoo Finance News."
   }
 }

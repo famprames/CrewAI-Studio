@@ -74,13 +74,13 @@ class MyAgent:
     def get_tool_display_name(self, tool):
         first_param_name = tool.get_parameter_names()[0] if tool.get_parameter_names() else None
         first_param_value = tool.parameters.get(first_param_name, '') if first_param_name else ''
-        return f"{tool.name} ({first_param_value if first_param_value else tool.tool_id})"
+        return f"{tool.display_name} ({first_param_value if first_param_value else tool.tool_id})"
 
     def is_valid(self, show_warning=False):
         for tool in self.tools:
             if not tool.is_valid(show_warning=show_warning):
                 if show_warning:
-                    st.warning(t('agent.invalid_tool', name=tool.name))
+                    st.warning(t('agent.invalid_tool', name=tool.display_name))
                 return False
         return True
 

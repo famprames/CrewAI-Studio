@@ -40,6 +40,7 @@ EXPORT_BASE_REQUIREMENTS = [
     'langchain-openai',
     'langchain-groq',
     'langchain-anthropic',
+    'markdown',
 ]
 
 # Extra packages required by specific tools.
@@ -208,6 +209,129 @@ def create_llm(provider_and_model, temperature=0.15):
 '''
 
 
+# Printable report helpers bundled with the export — mirrors the Studio's
+# generate_printable_view/get_tasks_outputs_str from utils.py, without the
+# Studio-only imports (streamlit markdown helper, crewai TaskOutput type).
+EXPORT_REPORT_PY = '''"""Printable report helpers bundled by CrewAI Studio export."""
+import re
+from datetime import datetime
+
+import markdown as md
+
+
+def normalize_list_indentation(md_text):
+    """Convert 2-space AI list indents into 4-space ones for Python-Markdown."""
+    normalized_lines = []
+    for line in md_text.splitlines():
+        m = re.match(r"^(?P<spaces> +)(?P<bullet>[-*])\\s+(.*)$", line)
+        if m:
+            level = len(m.group("spaces")) // 2
+            normalized_lines.append(" " * (level * 4) + m.group("bullet") + " " + m.group(3))
+        else:
+            normalized_lines.append(line)
+    return "\\n".join(normalized_lines)
+
+
+def get_tasks_outputs_str(tasks_output, tasks=None):
+    """Return a formatted string of task outputs, optionally with descriptions."""
+    str_res = ""
+    for idx, task_output in enumerate(tasks_output):
+        val = getattr(task_output, "raw", task_output)
+        desc = ""
+        if tasks and idx < len(tasks):
+            desc = getattr(tasks[idx], "description", str(tasks[idx]))
+        title = f"#  {desc}" if desc else "#  TASK"
+        str_res += f"\\n\\n{title}\\n{val}\\n\\n==========\\n"
+    return str_res
+
+
+def generate_printable_view(crew_name, inputs, formatted_result):
+    """Generate a simple printable HTML report."""
+    created_at_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    markdown_html = md.markdown(
+        normalize_list_indentation(formatted_result),
+        extensions=["markdown.extensions.extra"],
+    )
+    inputs_html = "".join(
+        f"<div class=\\"input-item\\"><strong>{k}:</strong><br><pre>{v}</pre></div>"
+        for k, v in (inputs or {}).items()
+    )
+    return f"""
+    <html>
+        <head>
+            <title>CrewAI-Studio result - {crew_name}</title>
+            <style>
+                body {{
+                    font-family: 'Arial', sans-serif;
+                    padding: 20px;
+                    max-width: 800px;
+                    margin: auto;
+                }}
+                h1 {{
+                    color: #f05252;
+                }}
+                .section {{
+                    margin: 20px 0;
+                }}
+                .input-item {{
+                    margin: 5px 0;
+                }}
+                h2, h3, h4, h5, h6 {{
+                    color: #333;
+                    margin-top: 1em;
+                }}
+                code {{
+                    background-color: #f5f5f5;
+                    padding: 2px 4px;
+                    border-radius: 3px;
+                    font-family: 'Consolas', 'Courier New', monospace;
+                }}
+                pre code {{
+                    background-color: #f5f5f5;
+                    display: block;
+                    padding: 10px;
+                    white-space: pre-wrap;
+                    font-family: 'Consolas', 'Courier New', monospace;
+                }}
+                @media print {{
+                    #printButton {{
+                        display: none;
+                    }}
+                    .page-break {{
+                        page-break-before: always;
+                    }}
+                    body {{
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }}
+                }}
+            </style>
+        </head>
+        <body>
+            <button id="printButton" onclick="window.print();" style="margin-bottom: 20px;">
+                Print
+            </button>
+
+            <h1>CrewAI-Studio result</h1>
+            <div class="section">
+                <h2>Crew Information</h2>
+                <p><strong>Crew Name:</strong> {crew_name}</p>
+                <p><strong>Created:</strong> {created_at_str}</p>
+            </div>
+            <div class="section">
+                <h2>Inputs</h2>
+                {inputs_html}
+            </div>
+            <div class="page-break"></div>
+            <div class="section">
+                {markdown_html}
+            </div>
+        </body>
+    </html>
+    """
+'''
+
+
 class PageExportCrew:
     def __init__(self):
         self.name = t("page.import_export")
@@ -307,6 +431,8 @@ Task(
             + [f'from langchain_community.tools import {name}' for name in community_tools_used]
         )
 
+        safe_crew_name = re.sub(r'\W+', '_', crew.name).strip('_') or 'crew'
+
         app_content = f"""import os
 
 import streamlit as st
@@ -317,6 +443,7 @@ load_dotenv()
 from crewai import Agent, Task, Crew, Process
 from crewai_tools import *
 from llms import create_llm
+from report import generate_printable_view, get_tasks_outputs_str
 {tool_imports}
 
 
@@ -368,10 +495,42 @@ def main():
 
     result = st.session_state.get("result")
     if result is not None:
+        final_text = result.raw if hasattr(result, "raw") else str(result)
         with st.expander("Final output", expanded=True):
-            st.write(result.raw if hasattr(result, "raw") else result)
+            st.write(final_text)
         with st.expander("Full output", expanded=False):
             st.write(result)
+
+        report_html = generate_printable_view({json_dumps_python(crew.name)}, placeholders, final_text)
+        tasks_output = getattr(result, "tasks_output", None)
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Open printable view"):
+                js = f'''
+                <script>
+                    var printWindow = window.open('', '_blank');
+                    printWindow.document.write({{report_html!r}});
+                    printWindow.document.close();
+                </script>
+                '''
+                st.components.v1.html(js, height=0)
+            st.download_button("Download report (HTML)", report_html,
+                               file_name="{safe_crew_name}_report.html", mime="text/html")
+        with col2:
+            if tasks_output:
+                complete_html = generate_printable_view(
+                    {json_dumps_python(crew.name)}, placeholders, get_tasks_outputs_str(tasks_output))
+                if st.button("Open printable view (tasks)"):
+                    js = f'''
+                    <script>
+                        var printWindow = window.open('', '_blank');
+                        printWindow.document.write({{complete_html!r}});
+                        printWindow.document.close();
+                    </script>
+                    '''
+                    st.components.v1.html(js, height=0)
+                st.download_button("Download tasks report (HTML)", complete_html,
+                                   file_name="{safe_crew_name}_tasks_report.html", mime="text/html")
 
 
 if __name__ == '__main__':
@@ -415,9 +574,12 @@ if __name__ == '__main__':
             f.write('\n'.join(lines) + '\n')
 
     def create_support_modules(self, output_dir, custom_tools_used):
-        """Write the bundled llms.py and (when custom tools ship) the i18n module."""
+        """Write the bundled llms.py, report.py and (when custom tools ship) the i18n module."""
         with open(os.path.join(output_dir, 'llms.py'), 'w') as f:
             f.write(EXPORT_LLMS_PY)
+
+        with open(os.path.join(output_dir, 'report.py'), 'w') as f:
+            f.write(EXPORT_REPORT_PY)
 
         if custom_tools_used:
             # The bundled custom tools translate their names/descriptions via i18n.

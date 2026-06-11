@@ -20,4 +20,5 @@ data
 data/*
 db/
 db/*
-stop_venv.bat
+stop_venv.bat.venv/
+__pycache__/

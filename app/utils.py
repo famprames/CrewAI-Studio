@@ -4,7 +4,7 @@ from streamlit import markdown
 import markdown as md
 from datetime import datetime
 import re
-from crewai import TaskOutput
+from crewai.tasks.task_output import TaskOutput
 
 
 def rnd_id(length=8):

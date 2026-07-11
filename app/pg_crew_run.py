@@ -1,6 +1,6 @@
 import re
 import streamlit as st
-from crewai import TaskOutput
+from crewai.tasks.task_output import TaskOutput
 from streamlit import session_state as ss
 import threading
 import ctypes

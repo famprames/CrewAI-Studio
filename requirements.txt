@@ -197,7 +197,7 @@ s3transfer>=0.15.0
 safetensors>=0.7.0
 scipy>=1.16.3
 semchunk>=2.2.2
-setuptools>=80.9.0
+setuptools<70.0.0
 shapely>=2.1.2
 shellingham>=1.5.4
 six>=1.17.0

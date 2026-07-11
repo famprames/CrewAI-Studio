@@ -28,7 +28,7 @@ colorama>=0.4.6
 coloredlogs>=15.0.1
 colorlog>=6.10.1
 crewai==0.86.0
-crewai-tools==0.14.0
+crewai-tools>=0.17.0
 cryptography>=46.0.7
 dataclasses-json>=0.6.7
 defusedxml>=0.7.1
